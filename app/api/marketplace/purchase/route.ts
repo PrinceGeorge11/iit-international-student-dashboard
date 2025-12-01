@@ -7,16 +7,17 @@ import Stripe from "stripe";
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-const stripe = stripeSecret
-  ? new Stripe(stripeSecret, {
-      apiVersion: "2024-06-20"
-    })
-  : null;
+// Single Stripe instance
+const stripe = stripeSecret ? new Stripe(stripeSecret) : null;
 
 export async function POST(req: NextRequest) {
+  // 1. Auth check
   const student = await getCurrentStudent();
-  if (!student) return new NextResponse("Unauthorized", { status: 401 });
+  if (!student) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
 
+  // 2. Parse body
   const { productId, paymentMethod } = await req.json();
 
   if (!productId || !paymentMethod) {
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
     return new NextResponse("Invalid payment method", { status: 400 });
   }
 
+  // 3. Load product
   const product = await prisma.product.findUnique({
     where: { id: productId }
   });
@@ -37,15 +39,22 @@ export async function POST(req: NextRequest) {
     return new NextResponse("Product not available", { status: 400 });
   }
 
+  // 🔴 Extra safety: ensure ownerId exists and is not null
+  if (!product.ownerId) {
+    return new NextResponse("Listing has no owner assigned", {
+      status: 500
+    });
+  }
+
   if (product.ownerId === student.id) {
     return new NextResponse("You cannot purchase your own listing", {
       status: 400
     });
   }
 
-  // Create order first
   let stripeSessionId: string | null = null;
 
+  // 4. If paying by card → Stripe Checkout
   if (paymentMethod === "card") {
     if (!stripe) {
       return new NextResponse(
@@ -79,13 +88,10 @@ export async function POST(req: NextRequest) {
     });
 
     stripeSessionId = session.id;
-
-    // NOTE:
-    // In a production app, you'd mark the order as "created" now and
-    // switch to "paid" in a Stripe webhook. For this project, we’ll
-    // immediately mark it as sold so it disappears from the marketplace.
+    // Demo behavior: we mark the order as "paid" immediately.
   }
 
+  // 5. Create order record
   const order = await prisma.order.create({
     data: {
       productId: product.id,
@@ -96,7 +102,7 @@ export async function POST(req: NextRequest) {
     }
   });
 
-  // Mark listing as sold / inactive
+  // 6. Mark listing as inactive / sold
   await prisma.product.update({
     where: { id: product.id },
     data: {
@@ -105,12 +111,12 @@ export async function POST(req: NextRequest) {
     }
   });
 
-  // Create buyer-seller conversation
+  // 7. Create buyer–seller conversation
   const conversation = await prisma.marketplaceConversation.create({
     data: {
       orderId: order.id,
       buyerId: student.id,
-      sellerId: product.ownerId,
+      sellerId: product.ownerId, // ✅ now guaranteed non-null by guard above
       messages: {
         create: {
           senderId: student.id,
@@ -123,8 +129,10 @@ export async function POST(req: NextRequest) {
     }
   });
 
+  // 8. Response: card → send checkout URL, in-person → go straight to chat
   if (paymentMethod === "card" && stripeSessionId) {
     const session = await stripe!.checkout.sessions.retrieve(stripeSessionId);
+
     return NextResponse.json({
       checkoutUrl: session.url,
       orderId: order.id,
@@ -132,7 +140,6 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // In-person: no external redirect, just send user to chat
   return NextResponse.json({
     orderId: order.id,
     conversationId: conversation.id
