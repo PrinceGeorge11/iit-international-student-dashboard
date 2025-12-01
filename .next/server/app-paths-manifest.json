@@ -1,4 +1,11 @@
 {
-  "/page": "app/page.js",
-  "/marketplace/page": "app/marketplace/page.js"
+  "/social-networking/page": "app/social-networking/page.js",
+  "/campus-navigation/page": "app/campus-navigation/page.js",
+  "/pre-arrival/page": "app/pre-arrival/page.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/resource-directory/page": "app/resource-directory/page.js",
+  "/api/chat/rooms/route": "app/api/chat/rooms/route.js",
+  "/api/chat/messages/route": "app/api/chat/messages/route.js",
+  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
+  "/marketplace/sell/page": "app/marketplace/sell/page.js"
 }

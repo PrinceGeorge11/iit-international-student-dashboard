@@ -1,1 +1,8 @@
-{}
+{
+  "components\\campus-navigation\\CampusMap.tsx -> react-leaflet": {
+    "id": "components\\campus-navigation\\CampusMap.tsx -> react-leaflet",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_react-leaflet_lib_index_js.js"
+    ]
+  }
+}
