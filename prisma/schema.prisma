@@ -9,9 +9,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/* =========================
-   STUDENTS & AUTH
-   ======================= */
+// =========================
+// STUDENTS & AUTH
+// =========================
 
 model Student {
   id          String   @id @default(cuid())
@@ -25,30 +25,30 @@ model Student {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // 🔴 Chat relations (dashboard real-time chat)
+  // Chat relations
   messages         ChatMessage[]
   pinnedRooms      StudentPinnedRoom[]
   lastActiveRoomId String?
   lastActiveRoom   ChatRoom?           @relation("LastActiveRoom", fields: [lastActiveRoomId], references: [id])
 
-  // 🔴 Marketplace relations
-  listings Product[] @relation("StudentListings") // items this student is selling
-  orders   Order[]   @relation("StudentOrders") // items this student has bought
+  // Marketplace relations
+  listings Product[] @relation("StudentListings")
+  orders   Order[]   @relation("StudentOrders")
 
-  // 🔴 Marketplace conversations (buyer/seller)
+  // Marketplace conversations
   buyerConversations  MarketplaceConversation[] @relation("MarketplaceBuyer")
   sellerConversations MarketplaceConversation[] @relation("MarketplaceSeller")
 
-  // 🔴 Marketplace chat messages (individual messages)
+  // Marketplace messages
   marketplaceMessages MarketplaceMessage[] @relation("MarketplaceMessages")
 
-  // 🔴 Admin
+  // Admin
   announcements Announcement[] @relation("AnnouncementAuthor")
 }
 
-/* =========================
-   CHAT ROOMS (GROUP CHAT)
-   ======================= */
+// =========================
+// CHAT ROOMS (GROUP CHAT)
+// =========================
 
 model ChatRoom {
   id          String        @id @default(cuid())
@@ -87,9 +87,9 @@ model StudentPinnedRoom {
   @@id([studentId, roomId])
 }
 
-/* =========================
-   ANNOUNCEMENTS (ADMIN)
-   ======================= */
+// =========================
+// ANNOUNCEMENTS (ADMIN)
+// =========================
 
 model Announcement {
   id          String   @id @default(cuid())
@@ -100,9 +100,9 @@ model Announcement {
   createdBy   Student  @relation("AnnouncementAuthor", fields: [createdById], references: [id])
 }
 
-/* =========================
-   MARKETPLACE
-   ======================= */
+// =========================
+// MARKETPLACE
+// =========================
 
 model Product {
   id          String @id @default(cuid())
@@ -111,19 +111,16 @@ model Product {
   description String
   priceCents  Int
   category    String
-  condition   String // e.g. "Like New", "Good"
+  condition   String
   imageUrl    String
-  campus      String // e.g. "Mies Campus"
+  campus      String
 
-  // 🔹 Ownership (optional so existing rows don’t break)
   ownerId String?
   owner   Student? @relation("StudentListings", fields: [ownerId], references: [id])
 
-  // 🔹 Availability
   isActive Boolean   @default(true)
   soldAt   DateTime?
 
-  // 🔹 Listing preferences (comma-separated: "card,in_person")
   paymentOptions String
 
   createdAt DateTime @default(now())
@@ -140,8 +137,8 @@ model Order {
   buyerId String
   buyer   Student @relation("StudentOrders", fields: [buyerId], references: [id])
 
-  paymentMethod String // "card" | "in_person"
-  status        String @default("created") // "created" | "paid" | "cancelled"
+  paymentMethod String
+  status        String @default("created")
 
   stripeSessionId String? @unique
 
