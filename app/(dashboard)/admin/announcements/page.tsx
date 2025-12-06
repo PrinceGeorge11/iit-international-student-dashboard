@@ -11,10 +11,19 @@ import { Card } from "@/components/ui/Card";
 
 export const dynamic = "force-dynamic";
 
-// Helper type: one announcement with its author
-type AnnouncementWithAuthor = Awaited<
-  ReturnType<typeof prisma.announcement.findMany>
->[number];
+// FIXED TYPE: manual type matching the include
+type AnnouncementWithAuthor = {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: Date;
+  createdById: string;
+  createdBy: {
+    id: string;
+    fullName: string | null;
+    email: string;
+  };
+};
 
 export default async function AdminAnnouncementsPage() {
   // Require admin
@@ -23,6 +32,7 @@ export default async function AdminAnnouncementsPage() {
     redirect("/dashboard");
   }
 
+  // FIXED: include author so createdBy exists
   const announcements: AnnouncementWithAuthor[] =
     await prisma.announcement.findMany({
       orderBy: { createdAt: "desc" },
@@ -31,10 +41,10 @@ export default async function AdminAnnouncementsPage() {
           select: {
             id: true,
             fullName: true,
-            email: true
-          }
-        }
-      }
+            email: true,
+          },
+        },
+      },
     });
 
   return (
@@ -42,13 +52,13 @@ export default async function AdminAnnouncementsPage() {
       {/* Left sidebar */}
       <Sidebar />
 
-      {/* Right side: navbar + content */}
+      {/* Right side */}
       <div className="flex min-h-screen flex-1 flex-col">
         <TopNavbar />
 
         <main className="flex-1 overflow-y-auto bg-slate-900 p-4 md:p-6">
           <div className="mx-auto max-w-5xl space-y-6">
-            {/* Hero / header */}
+            {/* Header */}
             <section className="grid gap-4 md:grid-cols-[1.7fr,1.3fr]">
               <Card className="bg-slate-950/90 border-red-500/30 shadow-[0_18px_40px_rgba(127,17,17,0.35)]">
                 <div className="flex items-start gap-3">
@@ -65,7 +75,6 @@ export default async function AdminAnnouncementsPage() {
                     <p className="text-[11px] text-slate-300">
                       Use this panel to post important messages about arrivals,
                       immigration, academic deadlines, housing, and campus life.
-                      Students will see these in their dashboard and notifications.
                     </p>
                   </div>
                 </div>
@@ -83,8 +92,7 @@ export default async function AdminAnnouncementsPage() {
                       </h2>
                       <p className="text-[11px] text-slate-300">
                         Each announcement shows the title, body, timestamp, and
-                        your name as the author. You can later wire these into
-                        email or push notifications.
+                        your name as the author.
                       </p>
                     </div>
                   </div>
@@ -118,15 +126,11 @@ export default async function AdminAnnouncementsPage() {
 
               {announcements.length === 0 ? (
                 <p className="rounded-lg bg-slate-900/80 px-3 py-2 text-[11px] text-slate-300">
-                  No announcements yet. Use{" "}
-                  <span className="font-semibold text-red-300">
-                    “Create new announcement”
-                  </span>{" "}
-                  to post your first update.
+                  No announcements yet.
                 </p>
               ) : (
                 <ul className="space-y-3 text-[11px]">
-                  {announcements.map((a: AnnouncementWithAuthor) => (
+                  {announcements.map((a) => (
                     <li
                       key={a.id}
                       className="rounded-xl border border-slate-800 bg-slate-950/80 p-3"
@@ -140,19 +144,20 @@ export default async function AdminAnnouncementsPage() {
                             {a.body}
                           </p>
                         </div>
+
                         <div className="text-right text-[10px] text-slate-400">
                           <p>
                             {new Date(a.createdAt).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
-                              year: "numeric"
+                              year: "numeric",
                             })}
                           </p>
-                          {a.createdBy && (
-                            <p className="mt-0.5">
-                              By {a.createdBy.fullName || a.createdBy.email}
-                            </p>
-                          )}
+
+                          {/* createdBy is guaranteed now */}
+                          <p className="mt-0.5">
+                            By {a.createdBy.fullName || a.createdBy.email}
+                          </p>
                         </div>
                       </div>
                     </li>
