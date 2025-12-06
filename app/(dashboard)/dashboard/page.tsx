@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { RealtimeGroupChat } from "@/components/chat/RealtimeGroupChat";
 import { prisma } from "@/lib/prisma";
 
-// Feature modules (cards)
+// 🧾 Feature modules (cards)
 const featureCards = [
   {
     id: "pre-arrival",
@@ -47,7 +47,7 @@ const featureCards = [
   }
 ];
 
-// Campus groups (simple grid, no slider)
+// 👥 Campus groups (simple grid)
 const campusGroups = [
   {
     name: "International Student Welcome Circle",
@@ -76,9 +76,14 @@ const campusGroups = [
   }
 ];
 
+// 🔎 Strong type for products including owner
+type ProductWithOwner = Awaited<
+  ReturnType<typeof prisma.product.findMany>
+>[number];
+
 export default async function DashboardPage() {
   // Latest active marketplace listings from Neon via Prisma
-  const products = await prisma.product.findMany({
+  const products: ProductWithOwner[] = await prisma.product.findMany({
     where: { isActive: true },
     orderBy: { createdAt: "desc" },
     take: 4,
@@ -299,10 +304,15 @@ export default async function DashboardPage() {
             </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
-              {products.map((product) => {
+              {products.map((product: ProductWithOwner) => {
                 const price = (product.priceCents || 0) / 100;
                 const sellerName =
                   (product.owner as any)?.fullName || "IIT student";
+                const imageSrc =
+                  product.imageUrl && product.imageUrl.length > 0
+                    ? product.imageUrl
+                    : "/placeholder-market.jpg";
+
                 return (
                   <Link
                     key={product.id}
@@ -311,7 +321,7 @@ export default async function DashboardPage() {
                   >
                     <div className="relative h-24 w-full overflow-hidden">
                       <Image
-                        src={product.imageUrl}
+                        src={imageSrc}
                         alt={product.title}
                         fill
                         className="object-cover transition-transform duration-300 group-hover:scale-105"

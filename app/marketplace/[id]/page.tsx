@@ -7,29 +7,31 @@ import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Card } from "@/components/ui/Card";
 import { PurchaseActions } from "@/components/marketplace/PurchaseActions";
 
+// Next 15 generated type expects params to be a Promise
 type PageProps = {
-  params: {
-    id: string; // if your route folder is [slug], change this to slug: string
-  };
+  params: Promise<{
+    id: string;
+  }>;
 };
 
 export default async function MarketplaceProductPage({ params }: PageProps) {
-  // If your route is /marketplace/[slug], change this where clause:
-  // where: { slug: params.id } or where: { slug: params.slug }
+  // Await the params Promise to get the id
+  const { id } = await params;
+
   const product = await prisma.product.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       owner: true
     }
   });
 
   if (!product) {
-    notFound();
+    return notFound();
   }
 
   const displayPrice = (product.priceCents / 100).toFixed(2);
 
-  // Map to the shape expected by PurchaseActions (with nullable owner)
+  // Shape it for PurchaseActions (allow owner to be null-safe)
   const uiProduct = {
     id: product.id,
     title: product.title,
@@ -42,12 +44,16 @@ export default async function MarketplaceProductPage({ params }: PageProps) {
           fullName: product.owner.fullName,
           program: product.owner.program
         }
-      : null
+      : {
+          id: "",
+          fullName: "IIT student",
+          program: null
+        }
   };
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
-      {/* Left sidebar (sticky in its own component) */}
+      {/* Left sidebar */}
       <Sidebar />
 
       {/* Right side: top navbar + page content */}

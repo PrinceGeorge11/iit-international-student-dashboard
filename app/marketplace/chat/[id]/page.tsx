@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { MarketplaceChat } from "@/components/marketplace/MarketplaceChat";
 
 interface Props {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export const dynamic = "force-dynamic";

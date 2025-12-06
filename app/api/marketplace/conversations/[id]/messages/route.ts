@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentStudent } from "@/lib/auth";
 
 interface Params {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export async function GET(_req: NextRequest, { params }: Params) {
