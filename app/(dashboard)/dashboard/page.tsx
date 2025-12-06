@@ -7,9 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { RealtimeGroupChat } from "@/components/chat/RealtimeGroupChat";
 import { prisma } from "@/lib/prisma";
 
-// =========================
-// Feature Modules (cards)
-// =========================
+// 🧾 Feature modules (cards)
 const featureCards = [
   {
     id: "pre-arrival",
@@ -49,9 +47,7 @@ const featureCards = [
   },
 ];
 
-// =========================
-// Campus Groups
-// =========================
+// 👥 Campus groups
 const campusGroups = [
   {
     name: "International Student Welcome Circle",
@@ -80,48 +76,35 @@ const campusGroups = [
   },
 ];
 
-// =========================
-// Types
-// =========================
-type ProductWithOwnerId = Awaited<ReturnType<typeof prisma.product.findMany>>[number];
-type Student = Awaited<ReturnType<typeof prisma.student.findMany>>[number];
+// 🔎 Type for marketplace products including owner
+type ProductWithOwner = {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  priceCents: number;
+  category: string;
+  condition: string;
+  imageUrl: string;
+  campus: string;
+  ownerId: string | null;
+  owner?: { fullName: string } | null;
+  isActive: boolean;
+  soldAt: Date | null;
+  paymentOptions: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
-// =========================
-// Dashboard Page
-// =========================
 export default async function DashboardPage() {
-  // Fetch latest active marketplace listings
-  const products: ProductWithOwnerId[] = await prisma.product.findMany({
+  // Latest active marketplace listings
+  const products: ProductWithOwner[] = await prisma.product.findMany({
     where: { isActive: true },
     orderBy: { createdAt: "desc" },
     take: 4,
-    select: {
-      id: true,
-      title: true,
-      slug: true,
-      description: true,
-      priceCents: true,
-      category: true,
-      condition: true,
-      imageUrl: true,
-      campus: true,
-      ownerId: true,
-      isActive: true,
-      soldAt: true,
-      paymentOptions: true,
-      createdAt: true,
-      updatedAt: true,
+    include: {
+      owner: { select: { fullName: true } },
     },
-  });
-
-  // Fetch students who are owners of the products
-  const ownerIds = products.map((p) => p.ownerId).filter(Boolean) as string[];
-  const students: Student[] = await prisma.student.findMany({
-    where: { id: { in: ownerIds } },
-  });
-  const studentsMap: Record<string, Student> = {};
-  students.forEach((s) => {
-    studentsMap[s.id] = s;
   });
 
   return (
@@ -140,14 +123,6 @@ export default async function DashboardPage() {
               Use this space to prepare for arrival, navigate campus, register
               for classes, connect with peers, and trade items through the
               student marketplace.
-            </p>
-            <p className="text-[11px] text-slate-800">
-              Start with <span className="font-semibold">Pre-Arrival</span> to
-              get your visa and documents ready, then explore{" "}
-              <span className="font-semibold">Campus Navigation</span>,{" "}
-              <span className="font-semibold">Academic Integration</span>, and{" "}
-              <span className="font-semibold">Social Networking</span> modules
-              as you settle into life in Chicago.
             </p>
           </div>
         </Card>
@@ -217,7 +192,7 @@ export default async function DashboardPage() {
         ))}
       </section>
 
-      {/* CAMPUS GROUPS SECTION */}
+      {/* CAMPUS GROUPS */}
       <section className="grid gap-4 lg:grid-cols-2">
         <Card className="bg-slate-50 border-red-100 shadow-[0_14px_32px_rgba(15,23,42,0.2)]">
           <div className="mb-2 flex items-center justify-between">
@@ -229,8 +204,7 @@ export default async function DashboardPage() {
                 Communities to join at IIT.
               </h2>
               <p className="text-[11px] text-slate-700">
-                These examples mirror the kinds of student orgs you&apos;ll find
-                through IIT and 312.iit.edu.
+                Examples of student orgs you&apos;ll find through IIT.
               </p>
             </div>
           </div>
@@ -252,7 +226,7 @@ export default async function DashboardPage() {
           </div>
         </Card>
 
-        {/* Upcoming milestones */}
+        {/* Quick Events */}
         <Card className="bg-slate-50 border-red-100 shadow-[0_14px_32px_rgba(15,23,42,0.2)]">
           <div className="mb-2 flex items-center gap-2">
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-red-600/15 text-red-600 ring-1 ring-red-300">
@@ -276,9 +250,9 @@ export default async function DashboardPage() {
         </Card>
       </section>
 
-      {/* GROUP CHAT + MARKETPLACE SECTION */}
+      {/* GROUP CHAT + MARKETPLACE */}
       <section className="grid gap-4 xl:grid-cols-[1.6fr,1.4fr]">
-        {/* Real-time chat card */}
+        {/* Group Chat */}
         <Card className="bg-slate-50 border-red-100 shadow-[0_16px_40px_rgba(15,23,42,0.22)]">
           <div className="mb-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-600">
@@ -288,8 +262,7 @@ export default async function DashboardPage() {
               New Arrivals · Airport, housing, and first-week questions
             </h2>
             <p className="text-[11px] text-slate-700">
-              Chat with other international students in real time. Messages show
-              names and avatars from your dashboard profile.
+              Chat with other international students in real time.
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white">
@@ -297,7 +270,7 @@ export default async function DashboardPage() {
           </div>
         </Card>
 
-        {/* Marketplace section */}
+        {/* Marketplace */}
         <Card className="bg-slate-50 border-red-100 shadow-[0_16px_40px_rgba(15,23,42,0.22)]">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
@@ -305,7 +278,7 @@ export default async function DashboardPage() {
                 Student Marketplace
               </p>
               <h2 className="text-sm font-semibold text-slate-900">
-                Latest listings from IIT students.
+                Latest listings from IIT students
               </h2>
               <p className="text-[11px] text-slate-700">
                 Buy or sell textbooks, furniture, electronics, and more.
@@ -334,8 +307,7 @@ export default async function DashboardPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               {products.map((product) => {
                 const price = (product.priceCents || 0) / 100;
-                const seller = studentsMap[product.ownerId || ""];
-                const sellerName = seller?.fullName || "IIT student";
+                const sellerName = product.owner?.fullName || "IIT student";
                 const imageSrc =
                   product.imageUrl && product.imageUrl.length > 0
                     ? product.imageUrl
