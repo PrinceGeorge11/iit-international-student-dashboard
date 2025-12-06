@@ -29,7 +29,7 @@ model Student {
   messages         ChatMessage[]
   pinnedRooms      StudentPinnedRoom[]
   lastActiveRoomId String?
-  lastActiveRoom   ChatRoom?           @relation("LastActiveRoom", fields: [lastActiveRoomId], references: [id])
+  lastActiveRoom   ChatRoom? @relation("LastActiveRoom", fields: [lastActiveRoomId], references: [id])
 
   // Marketplace relations
   listings Product[] @relation("StudentListings")
@@ -59,7 +59,7 @@ model ChatRoom {
   createdAt   DateTime      @default(now())
 
   pinnedBy      StudentPinnedRoom[]
-  lastActiveFor Student[]           @relation("LastActiveRoom")
+  lastActiveFor Student[] @relation("LastActiveRoom")
 }
 
 model ChatMessage {
@@ -105,14 +105,14 @@ model Announcement {
 // =========================
 
 model Product {
-  id          String @id @default(cuid())
+  id          String   @id @default(cuid())
   title       String
-  slug        String @unique
+  slug        String   @unique
   description String
   priceCents  Int
   category    String
   condition   String
-  imageUrl    String
+  imageUrl    String?
   campus      String
 
   ownerId String?
