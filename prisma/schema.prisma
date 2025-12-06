@@ -11,10 +11,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/**
- * =========================
- * STUDENTS & AUTH
- * =======================
+/ * =========================
+   STUDENTS & AUTH
+ =======================
  */
 
 model Student {
@@ -50,10 +49,9 @@ model Student {
   announcements Announcement[] @relation("AnnouncementAuthor")
 }
 
-/**
- * =========================
- * CHAT ROOMS (GROUP CHAT)
- * =======================
+/ * =========================
+  CHAT ROOMS (GROUP CHAT)
+  =======================
  */
 
 model ChatRoom {
@@ -93,11 +91,9 @@ model StudentPinnedRoom {
   @@id([studentId, roomId])
 }
 
-/**
- * =========================
- * ANNOUNCEMENTS (ADMIN)
- * =======================
- */
+/*=========================
+  ANNOUNCEMENTS (ADMIN)
+ ======================= */
 
 model Announcement {
   id          String   @id @default(cuid())
@@ -108,10 +104,10 @@ model Announcement {
   createdBy   Student  @relation("AnnouncementAuthor", fields: [createdById], references: [id])
 }
 
-/**
- * =========================
- * MARKETPLACE
- * =======================
+/*
+  =========================
+  MARKETPLACE
+  =======================
  */
 
 model Product {
