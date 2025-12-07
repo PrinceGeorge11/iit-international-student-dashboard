@@ -2,43 +2,24 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    const { fullName, email, password, studentType, program, avatarUrl } = body;
 
-    const {
-      fullName,
-      email,
-      password,
-      studentType,
-      program,
-      avatarUrl
-    } = body as {
-      fullName?: string;
-      email?: string;
-      password?: string;
-      studentType?: string;
-      program?: string;
-      avatarUrl?: string | null;
-    };
-
-    // Basic validation
+    // -------- Validate Required Fields --------
     if (!fullName || !email || !password || !studentType || !program) {
       return NextResponse.json(
-        {
-          error:
-            "Full name, email, password, student type, and program are required."
-        },
+        { error: "All required fields must be filled." },
         { status: 400 }
       );
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
-    // Check if student already exists
+    // -------- Check if Email Already Exists --------
     const existing = await prisma.student.findUnique({
-      where: { email: normalizedEmail }
+      where: { email },
     });
 
     if (existing) {
@@ -48,19 +29,19 @@ export async function POST(req: Request) {
       );
     }
 
-    // Hash password
+    // -------- Hash Password --------
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create student
-    const student = await prisma.student.create({
+    // -------- Create User in DB --------
+    const newStudent = await prisma.student.create({
       data: {
         fullName,
-        email: normalizedEmail,
-        password: hashedPassword, // 🔴 if your field is named `passwordHash`, change this
+        email,
+        password: hashedPassword,
         studentType,
         program,
-        avatarUrl: avatarUrl ?? null
-        // isAdmin defaults to false from your Prisma schema
+        avatarUrl: avatarUrl ?? null,
+        isAdmin: false,
       },
       select: {
         id: true,
@@ -69,22 +50,17 @@ export async function POST(req: Request) {
         studentType: true,
         program: true,
         avatarUrl: true,
-        isAdmin: true,
-        createdAt: true
-      }
+      },
     });
 
     return NextResponse.json(
-      {
-        message: "Student registered successfully.",
-        student
-      },
+      { message: "Registration successful", student: newStudent },
       { status: 201 }
     );
   } catch (error) {
-    console.error("⚠️ Register error:", error);
+    console.error("REGISTER ERROR:", error);
     return NextResponse.json(
-      { error: "Failed to register student." },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
