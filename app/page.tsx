@@ -8,7 +8,7 @@ import Image from "next/image";
 const sliderImages = [
   {
     id: 1,
-    src: "/walking.jpg",
+    src: "/Walking.jpg",
     alt: "International students arriving at IIT campus"
   },
   {
