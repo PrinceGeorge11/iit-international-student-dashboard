@@ -37,7 +37,6 @@ export default function RegisterPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Check file size (limit to 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError("Profile image must be less than 5MB");
       return;
@@ -62,8 +61,6 @@ export default function RegisterPage() {
       formData.append("file", avatarFile);
       formData.append("upload_preset", UPLOAD_PRESET);
 
-      console.log("📤 Uploading to Cloudinary...");
-      
       const res = await fetch(
         `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`,
         {
@@ -73,8 +70,6 @@ export default function RegisterPage() {
       );
 
       const data = await res.json();
-      console.log("📥 Cloudinary response:", data);
-      
       if (!res.ok) {
         console.error("Cloudinary upload error:", data);
         return null;
@@ -92,7 +87,6 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    console.log("🚀 Form submitted");
 
     // Trim inputs
     const trimmedFullName = fullName.trim();
@@ -100,134 +94,106 @@ export default function RegisterPage() {
     const trimmedStudentType = studentType.trim();
     const trimmedProgram = program.trim();
 
-    console.log("📋 Form data:", {
-      fullName: trimmedFullName,
-      email: trimmedEmail,
-      passwordLength: password.length,
-      studentType: trimmedStudentType,
-      program: trimmedProgram,
-      hasAvatar: !!avatarFile
-    });
-
     if (!trimmedFullName || !trimmedEmail || !password || !trimmedStudentType || !trimmedProgram) {
-      const errorMsg = "Full name, email, password, student type, and program are required.";
-      console.error("❌ Validation error:", errorMsg);
-      setError(errorMsg);
+      setError("Full name, email, password, student type, and program are required.");
       return;
     }
 
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
-      const errorMsg = "Please enter a valid email address.";
-      console.error("❌ Email validation error:", errorMsg);
-      setError(errorMsg);
+      setError("Please enter a valid email address.");
       return;
     }
 
     if (password.length < 8) {
-      const errorMsg = "Password must be at least 8 characters long.";
-      console.error("❌ Password validation error:", errorMsg);
-      setError(errorMsg);
+      setError("Password must be at least 8 characters long.");
       return;
     }
 
     if (password !== confirmPassword) {
-      const errorMsg = "Passwords do not match.";
-      console.error("❌ Password mismatch error:", errorMsg);
-      setError(errorMsg);
+      setError("Passwords do not match.");
       return;
     }
 
     setLoading(true);
-    console.log("⏳ Starting registration process...");
 
     try {
       // 1) Upload avatar if selected
       let avatarUrl: string | null = null;
       if (avatarFile) {
-        console.log("🖼️ Uploading avatar...");
         avatarUrl = await uploadAvatarToCloudinary();
-        console.log("✅ Avatar upload result:", avatarUrl ? "Success" : "Failed/Skipped");
       }
 
-      // 2) Call register API
-      const apiUrl = "/api/auth/register";
-      const requestBody = {
-        fullName: trimmedFullName,
-        email: trimmedEmail,
-        password,
-        studentType: trimmedStudentType,
-        program: trimmedProgram,
-        avatarUrl
-      };
-
-      console.log("📤 Sending request to:", apiUrl);
-      console.log("📦 Request body:", JSON.stringify(requestBody, null, 2));
-
-      const res = await fetch(apiUrl, {
+      // 2) Call register API - FIX: Simplified error handling
+      const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({
+          fullName: trimmedFullName,
+          email: trimmedEmail,
+          password,
+          studentType: trimmedStudentType,
+          program: trimmedProgram,
+          avatarUrl
+        })
       });
 
-      console.log("📥 Response status:", res.status);
-      console.log("📥 Response headers:", Object.fromEntries(res.headers.entries()));
+      // FIX: Read response only once
+      let responseData;
+      let responseText = "";
       
-      let data;
       try {
-        data = await res.json();
-        console.log("📥 Response data:", data);
-      } catch (parseError) {
-        console.error("❌ Failed to parse response as JSON");
-        const textResponse = await res.text();
-        console.log("📥 Raw response:", textResponse);
-        throw new Error("Server returned invalid JSON");
+        // Try to parse as JSON first
+        responseData = await res.json();
+      } catch (jsonError) {
+        // If JSON parsing fails, try to read as text
+        try {
+          responseText = await res.text();
+          console.error("Response was not JSON:", responseText);
+        } catch (textError) {
+          console.error("Could not read response at all:", textError);
+        }
+        throw new Error("Server returned an invalid response");
       }
-      
+
+      // FIX: Check response status
       if (!res.ok) {
-        console.error("❌ API error response:", data);
-        throw new Error(data.error || `Registration failed (${res.status})`);
+        // Use the error from responseData if available
+        const errorMessage = responseData?.error || 
+                            responseText || 
+                            `Registration failed (${res.status})`;
+        throw new Error(errorMessage);
       }
 
       // 3) Success handling
-      console.log("✅ Registration successful:", data);
-      
-      // Clear form
-      setFullName("");
-      setEmail("");
-      setPassword("");
-      setConfirmPassword("");
-      setStudentType("");
-      setProgram("");
-      setAvatarFile(null);
-      setAvatarPreview(null);
-      
-      // Show success message
-      setError("✅ Registration successful! Redirecting to login...");
-      
-      // Redirect after delay
-      setTimeout(() => {
-        console.log("🔄 Redirecting to login...");
-        router.push("/login");
-      }, 2000);
+      if (responseData.message === "Registration successful") {
+        // Clear form
+        setFullName("");
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
+        setStudentType("");
+        setProgram("");
+        setAvatarFile(null);
+        setAvatarPreview(null);
+        
+        // Show success message
+        setError("✅ Registration successful! Redirecting to login...");
+        
+        // Redirect after delay
+        setTimeout(() => {
+          router.push("/login");
+        }, 2000);
+      } else {
+        throw new Error("Unexpected response from server.");
+      }
       
     } catch (err: any) {
-      console.error("❌ Registration catch error:", err);
-      console.error("❌ Error details:", {
-        name: err.name,
-        message: err.message,
-        stack: err.stack
-      });
-      
-      // Set error message
-      const errorMsg = err.message || "Registration failed. Please try again.";
-      setError(errorMsg);
-      
+      console.error("Registration error:", err);
+      setError(err.message || "Registration failed. Please try again.");
     } finally {
-      console.log("🏁 Registration process complete");
       setLoading(false);
     }
   };
@@ -249,16 +215,7 @@ export default function RegisterPage() {
       <form
         onSubmit={handleSubmit}
         className="space-y-4 rounded-2xl bg-white p-5 shadow-sm shadow-slate-300/80"
-        noValidate
       >
-        {/* Debug info */}
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-2 text-xs">
-          <p className="font-semibold text-blue-800">Debug Info:</p>
-          <p>CLOUD_NAME: {CLOUD_NAME ? "✅ Set" : "❌ Missing"}</p>
-          <p>UPLOAD_PRESET: {UPLOAD_PRESET ? "✅ Set" : "❌ Missing"}</p>
-          <p>Status: {loading ? "⏳ Loading..." : "✅ Ready"}</p>
-        </div>
-
         {error && (
           <div className={`rounded-lg border px-3 py-2 text-xs ${
             error.includes("✅") || error.includes("successful") 
@@ -425,24 +382,6 @@ export default function RegisterPage() {
           </Link>
         </p>
       </form>
-
-      {/* Debug section */}
-      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
-        <h3 className="font-semibold text-slate-700">Debug Console:</h3>
-        <p className="mt-1 text-slate-600">Open browser console (F12) to see detailed logs</p>
-        <button
-          onClick={() => {
-            console.log("🧪 Test button clicked");
-            console.log("Current state:", {
-              fullName, email, password, studentType, program,
-              hasAvatar: !!avatarFile
-            });
-          }}
-          className="mt-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs hover:bg-slate-50"
-        >
-          Log Current State
-        </button>
-      </div>
     </div>
   );
 }
