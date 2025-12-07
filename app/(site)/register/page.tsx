@@ -12,10 +12,6 @@ const STUDENT_TYPES = [
   "Other"
 ];
 
-// Read Cloudinary config from env (must start with NEXT_PUBLIC_)
-const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
 export default function RegisterPage() {
   const router = useRouter();
 
@@ -28,10 +24,10 @@ export default function RegisterPage() {
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>("");
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,45 +44,10 @@ export default function RegisterPage() {
     setError(null);
   };
 
-  const uploadAvatarToCloudinary = async (): Promise<string | null> => {
-    if (!avatarFile) return null;
-    if (!CLOUD_NAME || !UPLOAD_PRESET) {
-      console.warn("Missing Cloudinary env vars - skipping avatar upload");
-      return null;
-    }
-
-    setAvatarUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", avatarFile);
-      formData.append("upload_preset", UPLOAD_PRESET);
-
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`,
-        {
-          method: "POST",
-          body: formData
-        }
-      );
-
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Cloudinary upload error:", data);
-        return null;
-      }
-
-      return data.secure_url as string;
-    } catch (err) {
-      console.error("Cloudinary upload error:", err);
-      return null;
-    } finally {
-      setAvatarUploading(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setDebugInfo("");
 
     // Trim inputs
     const trimmedFullName = fullName.trim();
@@ -118,56 +79,70 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      // 1) Upload avatar if selected
-      let avatarUrl: string | null = null;
-      if (avatarFile) {
-        avatarUrl = await uploadAvatarToCloudinary();
-      }
+      // Skip avatar upload for now to simplify debugging
+      const avatarUrl = null;
 
-      // 2) Call register API - FIX: Simplified error handling
+      // Log the request
+      const requestBody = {
+        fullName: trimmedFullName,
+        email: trimmedEmail,
+        password,
+        studentType: trimmedStudentType,
+        program: trimmedProgram,
+        avatarUrl
+      };
+      
+      console.log("📤 Sending request to /api/auth/register");
+      console.log("📦 Request body:", requestBody);
+
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          fullName: trimmedFullName,
-          email: trimmedEmail,
-          password,
-          studentType: trimmedStudentType,
-          program: trimmedProgram,
-          avatarUrl
-        })
+        body: JSON.stringify(requestBody)
       });
 
-      // FIX: Read response only once
-      let responseData;
-      let responseText = "";
+      // Get the raw response text first
+      const rawResponse = await res.text();
+      console.log("📥 Raw response:", rawResponse);
+      console.log("📥 Response status:", res.status);
       
+      // Update debug info
+      setDebugInfo(`Status: ${res.status}\nResponse: ${rawResponse.substring(0, 200)}...`);
+
+      let responseData;
       try {
-        // Try to parse as JSON first
-        responseData = await res.json();
+        // Try to parse as JSON
+        responseData = JSON.parse(rawResponse);
+        console.log("✅ Parsed JSON response:", responseData);
       } catch (jsonError) {
-        // If JSON parsing fails, try to read as text
-        try {
-          responseText = await res.text();
-          console.error("Response was not JSON:", responseText);
-        } catch (textError) {
-          console.error("Could not read response at all:", textError);
+        console.error("❌ Failed to parse JSON:", jsonError);
+        console.error("Raw response was:", rawResponse);
+        
+        // Check for common HTML error pages
+        if (rawResponse.includes("<!DOCTYPE html>") || rawResponse.includes("<html")) {
+          throw new Error("Server returned an HTML page instead of JSON. This usually means the API route is not working correctly.");
+        } else if (rawResponse.includes("Internal Server Error")) {
+          throw new Error("Server experienced an internal error. Check the server logs.");
+        } else if (res.status === 404) {
+          throw new Error("API endpoint not found (404). Make sure /api/auth/register exists.");
+        } else if (res.status === 500) {
+          throw new Error("Server error (500). Check your API route implementation.");
+        } else {
+          throw new Error(`Server returned: ${rawResponse.substring(0, 100)}`);
         }
-        throw new Error("Server returned an invalid response");
       }
 
-      // FIX: Check response status
+      // Check response status
       if (!res.ok) {
-        // Use the error from responseData if available
         const errorMessage = responseData?.error || 
-                            responseText || 
+                            responseData?.message || 
                             `Registration failed (${res.status})`;
         throw new Error(errorMessage);
       }
 
-      // 3) Success handling
+      // Success handling
       if (responseData.message === "Registration successful") {
         // Clear form
         setFullName("");
@@ -195,6 +170,47 @@ export default function RegisterPage() {
       setError(err.message || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Test endpoint function
+  const testApiEndpoint = async () => {
+    setDebugInfo("Testing API endpoint...");
+    
+    try {
+      // First test if the API endpoint exists
+      const testRes = await fetch("/api/auth/register", {
+        method: "OPTIONS"
+      });
+      
+      setDebugInfo(prev => prev + `\nOPTIONS status: ${testRes.status}`);
+      
+      // Test with a minimal request
+      const testBody = {
+        fullName: "Test User",
+        email: `test${Date.now()}@example.com`,
+        password: "Test123456",
+        studentType: "Undergraduate",
+        program: "Computer Science",
+        avatarUrl: null
+      };
+      
+      console.log("🧪 Testing API with:", testBody);
+      
+      const testPostRes = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(testBody)
+      });
+      
+      const rawText = await testPostRes.text();
+      setDebugInfo(prev => prev + `\nPOST status: ${testPostRes.status}\nResponse: ${rawText.substring(0, 300)}`);
+      
+    } catch (testErr: any) {
+      setDebugInfo(prev => prev + `\nTest error: ${testErr.message}`);
+      console.error("Test error:", testErr);
     }
   };
 
@@ -244,14 +260,14 @@ export default function RegisterPage() {
         {/* Email */}
         <div className="space-y-1">
           <label className="block text-xs font-semibold text-slate-700">
-            IIT email<span className="text-red-500">*</span>
+            Email<span className="text-red-500">*</span>
           </label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-            placeholder="you@hawk.iit.edu"
+            placeholder="you@example.com"
             required
           />
         </div>
@@ -323,7 +339,7 @@ export default function RegisterPage() {
           />
         </div>
 
-        {/* Avatar upload */}
+        {/* Avatar upload - Optional for now */}
         <div className="space-y-1">
           <label className="block text-xs font-semibold text-slate-700">
             Profile photo (optional)
@@ -348,7 +364,7 @@ export default function RegisterPage() {
                 className="block w-full text-xs text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-red-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-red-500"
               />
               <p className="mt-1 text-[10px] text-slate-500">
-                Square images work best (e.g., 400x400). Max 5MB.
+                Optional - can add later
               </p>
             </div>
           </div>
@@ -356,7 +372,7 @@ export default function RegisterPage() {
 
         <button
           type="submit"
-          disabled={loading || avatarUploading}
+          disabled={loading}
           className="flex w-full items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-300 hover:bg-red-500 disabled:cursor-not-allowed disabled:bg-red-300"
         >
           {loading ? (
@@ -382,6 +398,59 @@ export default function RegisterPage() {
           </Link>
         </p>
       </form>
+
+      {/* Debug section */}
+      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-semibold text-slate-700">Debug Panel</h3>
+          <button
+            onClick={testApiEndpoint}
+            className="rounded border border-slate-300 bg-white px-2 py-1 text-xs hover:bg-slate-50"
+          >
+            Test API
+          </button>
+        </div>
+        
+        {debugInfo && (
+          <div className="mt-2">
+            <pre className="whitespace-pre-wrap break-words rounded bg-white p-2 text-xs text-slate-600">
+              {debugInfo}
+            </pre>
+          </div>
+        )}
+        
+        <div className="mt-2 text-xs text-slate-600">
+          <p className="font-semibold">Troubleshooting steps:</p>
+          <ol className="mt-1 list-inside list-decimal space-y-1">
+            <li>Open browser console (F12)</li>
+            <li>Check Network tab for the request</li>
+            <li>Click "Test API" button above</li>
+            <li>Check if /api/auth/register exists</li>
+            <li>Check server logs for errors</li>
+          </ol>
+        </div>
+      </div>
+
+      {/* Quick test form */}
+      <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+        <h3 className="text-xs font-semibold text-blue-800">Quick Test</h3>
+        <p className="mt-1 text-xs text-blue-600">
+          Use this test data to debug:
+        </p>
+        <button
+          onClick={() => {
+            setFullName("Test User");
+            setEmail(`test${Date.now()}@example.com`);
+            setPassword("Test123456");
+            setConfirmPassword("Test123456");
+            setStudentType("Undergraduate");
+            setProgram("Computer Science");
+          }}
+          className="mt-2 w-full rounded border border-blue-300 bg-blue-100 px-3 py-2 text-xs text-blue-700 hover:bg-blue-200"
+        >
+          Fill Test Data
+        </button>
+      </div>
     </div>
   );
 }
