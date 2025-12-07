@@ -76,13 +76,13 @@ const campusGroups = [
   }
 ];
 
-// Shape of products used on the dashboard
+// ✅ Allow imageUrl to be string | null (matches Prisma)
 type DashboardProduct = {
   id: string;
   slug: string;
   title: string;
   priceCents: number;
-  imageUrl: string;
+  imageUrl: string | null;
   owner: {
     fullName: string;
   } | null;
@@ -287,7 +287,7 @@ export default async function DashboardPage() {
 
         {/* Marketplace highlight */}
         <Card className="bg-slate-50 border-red-100 shadow-[0_16px_40px_rgba(15,23,42,0.22)]">
-          <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="mb-3 flex items-center justify_between gap-2">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-600">
                 Student Marketplace
@@ -301,7 +301,7 @@ export default async function DashboardPage() {
             </div>
             <Link
               href="/marketplace/sell"
-              className="hidden rounded-full bg-red-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm shadow-red-900/40 hover:bg-red-500 md:inline-flex"
+              className="hidden rounded_full bg-red-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm shadow-red-900/40 hover:bg-red-500 md:inline-flex"
             >
               Post a listing
             </Link>

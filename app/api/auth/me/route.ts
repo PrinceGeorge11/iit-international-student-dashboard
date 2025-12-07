@@ -1,4 +1,3 @@
-// app/api/auth/me/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
@@ -6,34 +5,32 @@ import { prisma } from "@/lib/prisma";
 
 const COOKIE_NAME = "student_session";
 
-type JwtPayload = {
-  id: string;
-  fullName: string;
-  email: string;
-  isAdmin?: boolean;
-};
-
 export async function GET() {
   try {
-    const cookieStore = cookies();
+    // ✔ FIX: cookies() must be awaited in Next.js 14+
+    const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value;
+
     const secret = process.env.AUTH_JWT_SECRET;
-
     if (!token || !secret) {
-      // Not logged in
       return NextResponse.json({ student: null }, { status: 200 });
     }
 
-    let payload: JwtPayload;
+    let decoded: { id: string; email: string } | null = null;
+
     try {
-      payload = jwt.verify(token, secret) as JwtPayload;
-    } catch {
-      // Invalid / expired token → treat as logged out
+      decoded = jwt.verify(token, secret) as {
+        id: string;
+        email: string;
+      };
+    } catch (e) {
+      // Invalid token → return null
       return NextResponse.json({ student: null }, { status: 200 });
     }
 
+    // Fetch student from database
     const student = await prisma.student.findUnique({
-      where: { id: payload.id },
+      where: { id: decoded.id },
       select: {
         id: true,
         fullName: true,
@@ -45,13 +42,9 @@ export async function GET() {
       }
     });
 
-    if (!student) {
-      return NextResponse.json({ student: null }, { status: 200 });
-    }
-
     return NextResponse.json({ student }, { status: 200 });
-  } catch (error) {
-    console.error("GET /api/auth/me error:", error);
-    return NextResponse.json({ student: null }, { status: 200 });
+  } catch (err) {
+    console.error("Error in /api/auth/me:", err);
+    return NextResponse.json({ student: null }, { status: 500 });
   }
 }

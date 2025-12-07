@@ -1,73 +1,56 @@
-// app/api/chat/rooms/pin/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 
 const COOKIE_NAME = "student_session";
 
-type JwtPayload = {
-  id: string;
-};
-
-function getStudentId() {
-  const token = cookies().get(COOKIE_NAME)?.value;
+async function getStudentId() {
+  // ✔ FIX: await cookies()
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
   const secret = process.env.AUTH_JWT_SECRET;
+
   if (!token || !secret) return null;
+
   try {
-    const payload = jwt.verify(token, secret) as JwtPayload;
-    return payload.id;
+    const decoded = jwt.verify(token, secret) as { id: string };
+    return decoded.id;
   } catch {
     return null;
   }
 }
 
-export async function POST(req: Request) {
-  const studentId = getStudentId();
-  if (!studentId) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+// POST — Toggle pin/unpin a chat room
+export async function POST(req: NextRequest) {
+  try {
+    const studentId = await getStudentId();
+    if (!studentId) return new NextResponse("Unauthorized", { status: 401 });
 
-  const body = await req.json();
-  const { roomSlug, pin } = body as { roomSlug?: string; pin?: boolean };
+    const { roomId } = await req.json();
+    if (!roomId) return new NextResponse("Missing roomId", { status: 400 });
 
-  if (!roomSlug || typeof pin !== "boolean") {
-    return NextResponse.json(
-      { error: "roomSlug and pin are required" },
-      { status: 400 }
-    );
-  }
-
-  const room = await prisma.chatRoom.findUnique({
-    where: { slug: roomSlug }
-  });
-
-  if (!room) {
-    return NextResponse.json({ error: "Room not found" }, { status: 404 });
-  }
-
-  if (pin) {
-    await prisma.studentPinnedRoom.upsert({
-      where: {
-        studentId_roomId: {
-          studentId,
-          roomId: room.id
-        }
-      },
-      create: {
-        studentId,
-        roomId: room.id
-      },
-      update: {}
+    const existing = await prisma.studentPinnedRoom.findUnique({
+      where: { studentId_roomId: { studentId, roomId } }
     });
-  } else {
-    await prisma.studentPinnedRoom.deleteMany({
-      where: {
-        studentId,
-        roomId: room.id
-      }
-    });
-  }
 
-  return NextResponse.json({ ok: true });
+    if (existing) {
+      // Unpin (remove)
+      await prisma.studentPinnedRoom.delete({
+        where: { studentId_roomId: { studentId, roomId } }
+      });
+
+      return NextResponse.json({ pinned: false });
+    }
+
+    // Pin (create)
+    await prisma.studentPinnedRoom.create({
+      data: { studentId, roomId }
+    });
+
+    return NextResponse.json({ pinned: true });
+  } catch (err) {
+    console.error("Pin room API error:", err);
+    return new NextResponse("Server error", { status: 500 });
+  }
 }

@@ -1,5 +1,4 @@
-// app/api/auth/login/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -7,110 +6,82 @@ import { cookies } from "next/headers";
 
 const COOKIE_NAME = "student_session";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { email, password } = body as {
-      email?: string;
-      password?: string;
-    };
+    const { email, password } = await req.json();
 
     if (!email || !password) {
       return NextResponse.json(
-        { error: "Email and password are required." },
+        { error: "Email and password are required" },
         { status: 400 }
       );
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
-    // 🔍 Fetch the student (no select, we want all fields)
+    // Lookup student
     const student = await prisma.student.findUnique({
-      where: { email: normalizedEmail }
+      where: { email }
     });
 
     if (!student) {
       return NextResponse.json(
-        { error: "Invalid email or password." },
+        { error: "Invalid credentials" },
         { status: 401 }
       );
     }
 
-    // ✅ Try multiple possible password fields, to be safe
-    const storedHash =
-      (student as any).password ||
-      (student as any).passwordHash ||
-      (student as any).hashedPassword;
-
-    if (typeof storedHash !== "string" || storedHash.length === 0) {
-      console.error(
-        "Login error: student has no password hash stored. Keys:",
-        Object.keys(student as any)
-      );
+    // Validate password
+    const valid = await bcrypt.compare(password, student.password);
+    if (!valid) {
       return NextResponse.json(
-        { error: "Invalid email or password." },
+        { error: "Invalid credentials" },
         { status: 401 }
       );
     }
 
-    const isValid = await bcrypt.compare(password, storedHash);
-
-    if (!isValid) {
+    // Generate JWT
+    const secret = process.env.AUTH_JWT_SECRET;
+    if (!secret) {
       return NextResponse.json(
-        { error: "Invalid email or password." },
-        { status: 401 }
-      );
-    }
-
-    const jwtSecret = process.env.AUTH_JWT_SECRET;
-    if (!jwtSecret) {
-      console.error("Missing AUTH_JWT_SECRET env var");
-      return NextResponse.json(
-        { error: "Server misconfiguration." },
+        { error: "JWT secret is not configured" },
         { status: 500 }
       );
     }
 
-    // 🪪 Issue JWT
     const token = jwt.sign(
       {
         id: student.id,
-        fullName: student.fullName,
         email: student.email,
-        isAdmin: (student as any).isAdmin ?? false
+        isAdmin: student.isAdmin
       },
-      jwtSecret,
-      {
-        expiresIn: "7d"
-      }
+      secret,
+      { expiresIn: "7d" }
     );
 
-    // 🍪 Set cookie
-    const cookieStore = cookies();
-    cookieStore.set(COOKIE_NAME, token, {
+    // ✔ FIX: cookies() is async, must await
+    const cookieStore = await cookies();
+    cookieStore.set({
+      name: COOKIE_NAME,
+      value: token,
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 // 7 days
+      maxAge: 60 * 60 * 24 * 7 // 1 week
     });
 
     return NextResponse.json({
-      message: "Login successful.",
+      success: true,
       student: {
         id: student.id,
         fullName: student.fullName,
         email: student.email,
-        studentType: (student as any).studentType,
-        program: (student as any).program,
-        avatarUrl: (student as any).avatarUrl,
-        isAdmin: (student as any).isAdmin
+        isAdmin: student.isAdmin
       }
     });
-  } catch (error) {
-    console.error("⚠️ Login error:", error);
+  } catch (err) {
+    console.error("Login error:", err);
     return NextResponse.json(
-      { error: "Failed to login. Please try again." },
+      { error: "Server error during login" },
       { status: 500 }
     );
   }

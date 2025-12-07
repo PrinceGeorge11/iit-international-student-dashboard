@@ -1,20 +1,23 @@
 // app/api/profile/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 
 const COOKIE_NAME = "student_session";
 
-type JwtPayload = {
+interface JwtPayload {
   id: string;
   fullName: string;
   email: string;
   isAdmin?: boolean;
-};
+}
 
-function getCurrentStudentId() {
-  const cookieStore = cookies();
+/**
+ * Next.js 15: cookies() returns a Promise → MUST await.
+ */
+async function getCurrentStudentId(): Promise<string | null> {
+  const cookieStore = await cookies(); // ✅ FIXED
   const token = cookieStore.get(COOKIE_NAME)?.value;
   const secret = process.env.AUTH_JWT_SECRET;
 
@@ -23,13 +26,14 @@ function getCurrentStudentId() {
   try {
     const payload = jwt.verify(token, secret) as JwtPayload;
     return payload.id;
-  } catch {
+  } catch (err) {
+    console.error("JWT verification failed:", err);
     return null;
   }
 }
 
 export async function GET() {
-  const studentId = getCurrentStudentId();
+  const studentId = await getCurrentStudentId(); // ✅ FIXED
   if (!studentId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -53,18 +57,17 @@ export async function GET() {
   return NextResponse.json({ student });
 }
 
-export async function PUT(req: Request) {
-  const studentId = getCurrentStudentId();
+export async function PUT(req: NextRequest) {
+  const studentId = await getCurrentStudentId(); // ✅ FIXED
   if (!studentId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   const body = await req.json();
-  const { fullName, program, avatarUrl } = body as {
-    fullName?: string;
-    program?: string;
-    avatarUrl?: string | null;
-  };
+
+  const fullName: string | undefined = body.fullName;
+  const program: string | undefined = body.program;
+  const avatarUrl: string | null | undefined = body.avatarUrl;
 
   if (!fullName || !program) {
     return NextResponse.json(

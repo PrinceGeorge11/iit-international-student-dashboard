@@ -1,38 +1,34 @@
 // app/marketplace/chat/[id]/page.tsx
+
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentStudent } from "@/lib/auth";
 import { Card } from "@/components/ui/Card";
 import { MarketplaceChat } from "@/components/marketplace/MarketplaceChat";
 
-interface Props {
-  params: Promise<{ id: string }>;
-}
-
 export const dynamic = "force-dynamic";
 
-export default async function MarketplaceChatPage({ params }: Props) {
+export default async function MarketplaceChatPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  // ⬅ REQUIRED for Next.js 15
+  const { id } = await params;
+
   const student = await getCurrentStudent();
-  if (!student) {
-    redirect("/login");
-  }
+  if (!student) redirect("/login");
 
   const conversation = await prisma.marketplaceConversation.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
-      order: {
-        include: {
-          product: true
-        }
-      },
+      order: { include: { product: true } },
       buyer: true,
-      seller: true
-    }
+      seller: true,
+    },
   });
 
-  if (!conversation) {
-    redirect("/marketplace/my");
-  }
+  if (!conversation) redirect("/marketplace/my");
 
   if (
     conversation.buyerId !== student.id &&
@@ -53,13 +49,15 @@ export default async function MarketplaceChatPage({ params }: Props) {
         <p className="text-[11px] text-slate-600">
           You are chatting with{" "}
           <span className="font-semibold">
-            {otherParty.fullName || "IIT student"}
+            {otherParty?.fullName || "IIT student"}
           </span>
-          .
         </p>
       </Card>
 
-      <MarketplaceChat conversationId={conversation.id} currentUserId={student.id} />
+      <MarketplaceChat
+        conversationId={conversation.id}
+        currentUserId={student.id}
+      />
     </div>
   );
 }

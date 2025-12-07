@@ -1,35 +1,50 @@
 // app/api/admin/announcements/route.ts
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
+import { prisma } from "@/lib/prisma";
 
 const COOKIE_NAME = "student_session";
 
-type JwtPayload = {
-  id: string;
-  isAdmin?: boolean;
-};
+/**
+ * Validate admin from JWT cookie
+ */
+async function getAdmin() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
 
-function getAdmin() {
-  const token = cookies().get(COOKIE_NAME)?.value;
   const secret = process.env.AUTH_JWT_SECRET;
   if (!token || !secret) return null;
+
   try {
-    const payload = jwt.verify(token, secret) as JwtPayload;
-    if (!payload.isAdmin) return null;
-    return payload.id;
+    const decoded = jwt.verify(token, secret) as { id: string; isAdmin: boolean };
+
+    if (!decoded?.isAdmin) return null;
+
+    const admin = await prisma.student.findUnique({
+      where: { id: decoded.id }
+    });
+
+    return admin && admin.isAdmin ? admin : null;
   } catch {
     return null;
   }
 }
 
+/**
+ * GET — Fetch announcements
+ */
 export async function GET() {
+  const admin = await getAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const announcements = await prisma.announcement.findMany({
     orderBy: { createdAt: "desc" },
     include: {
       createdBy: {
-        select: { fullName: true, email: true }
+        select: { id: true, fullName: true, email: true }
       }
     }
   });
@@ -37,40 +52,31 @@ export async function GET() {
   return NextResponse.json({ announcements });
 }
 
-export async function POST(req: Request) {
-  const adminId = getAdmin();
-  if (!adminId) {
-    return NextResponse.json(
-      { error: "Admin access required" },
-      { status: 403 }
-    );
+/**
+ * POST — Create new announcement
+ */
+export async function POST(req: NextRequest) {
+  const admin = await getAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { title, body: message } = body as {
-    title?: string;
-    body?: string;
-  };
+  const { title, body } = await req.json();
 
-  if (!title || !message) {
+  if (!title || !body) {
     return NextResponse.json(
-      { error: "Title and body are required." },
+      { error: "Missing title or body" },
       { status: 400 }
     );
   }
 
-  const ann = await prisma.announcement.create({
+  const created = await prisma.announcement.create({
     data: {
       title,
-      body: message,
-      createdById: adminId
-    },
-    include: {
-      createdBy: {
-        select: { fullName: true, email: true }
-      }
+      body,                 // ⭐ matches Prisma schema
+      createdById: admin.id
     }
   });
 
-  return NextResponse.json({ announcement: ann });
+  return NextResponse.json({ announcement: created });
 }

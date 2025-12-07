@@ -2,57 +2,50 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-type RouteContext = {
+interface RouteParams {
   params: Promise<{ id: string }>;
-};
+}
 
-// PATCH /api/marketplace/products/:id
-// Body can include: { title?, description?, priceCents?, category?, condition?, imageUrl?, campus?, paymentOptions?, isActive? }
-export async function PATCH(req: NextRequest, { params }: RouteContext) {
-  const { id } = params;
+// PATCH — update a product
+export async function PATCH(req: NextRequest, context: RouteParams) {
+  const { id } = await context.params;   // ✅ FIXED: await params
 
   try {
     const body = await req.json();
-    const data: any = {};
-
-    if (body.title !== undefined) data.title = body.title;
-    if (body.description !== undefined) data.description = body.description;
-    if (body.priceCents !== undefined) data.priceCents = body.priceCents;
-    if (body.category !== undefined) data.category = body.category;
-    if (body.condition !== undefined) data.condition = body.condition;
-    if (body.imageUrl !== undefined) data.imageUrl = body.imageUrl;
-    if (body.campus !== undefined) data.campus = body.campus;
-    if (body.paymentOptions !== undefined)
-      data.paymentOptions = body.paymentOptions;
-    if (body.isActive !== undefined) data.isActive = body.isActive;
-    if (body.soldAt !== undefined) data.soldAt = body.soldAt;
 
     const updated = await prisma.product.update({
       where: { id },
-      data
+      data: {
+        title: body.title ?? undefined,
+        description: body.description ?? undefined,
+        priceCents: body.priceCents ?? undefined,
+        category: body.category ?? undefined,
+        condition: body.condition ?? undefined,
+        imageUrl: body.imageUrl ?? undefined,
+        campus: body.campus ?? undefined,
+        paymentOptions: body.paymentOptions ?? undefined,
+        isActive: body.isActive ?? undefined
+      }
     });
 
-    return NextResponse.json({ product: updated });
+    return NextResponse.json(updated);
   } catch (err) {
-    console.error("PATCH /api/marketplace/products/[id] error:", err);
-    return NextResponse.json(
-      { error: "Failed to update product" },
-      { status: 500 }
-    );
+    console.error("PATCH /products error:", err);
+    return new NextResponse("Error updating product", { status: 500 });
   }
 }
 
-// DELETE /api/marketplace/products/:id
-export async function DELETE(_req: NextRequest, { params }: RouteContext) {
-  const { id } = params;
+// DELETE — delete a product
+export async function DELETE(req: NextRequest, context: RouteParams) {
+  const { id } = await context.params;   // ✅ FIXED: await params
+
   try {
-    await prisma.product.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    await prisma.product.delete({
+      where: { id }
+    });
+    return new NextResponse(null, { status: 204 });
   } catch (err) {
-    console.error("DELETE /api/marketplace/products/[id] error:", err);
-    return NextResponse.json(
-      { error: "Failed to delete product" },
-      { status: 500 }
-    );
+    console.error("DELETE /products error:", err);
+    return new NextResponse("Error deleting product", { status: 500 });
   }
 }

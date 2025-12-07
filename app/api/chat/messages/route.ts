@@ -1,140 +1,100 @@
-// app/api/chat/messages/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
-import { pusherServer } from "@/lib/pusher";
 
 const COOKIE_NAME = "student_session";
 
-type JwtPayload = {
-  id: string;
-  fullName: string;
-  email: string;
-  avatarUrl?: string;
-};
-
-export async function GET(req: Request) {
+/**
+ * GET — Fetch messages for a chat room
+ */
+export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const roomSlug = searchParams.get("room");
-
-    if (!roomSlug) {
-      return NextResponse.json(
-        { error: "Missing room parameter" },
-        { status: 400 }
-      );
-    }
-
-    const room = await prisma.chatRoom.findUnique({
-      where: { slug: roomSlug }
-    });
-
-    if (!room) {
-      return NextResponse.json(
-        { error: "Room not found" },
-        { status: 404 }
-      );
+    const roomId = req.nextUrl.searchParams.get("roomId");
+    if (!roomId) {
+      return new NextResponse("Missing roomId", { status: 400 });
     }
 
     const messages = await prisma.chatMessage.findMany({
-      where: { roomId: room.id },
-      orderBy: { createdAt: "asc" },
-      take: 100,
+      where: { roomId },
       include: {
-        student: true
-      }
+        student: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true
+          }
+        }
+      },
+      orderBy: { createdAt: "asc" }
     });
 
-    return NextResponse.json({ room, messages });
+    return NextResponse.json({ messages });
   } catch (error) {
-    console.error("GET /api/chat/messages error:", error);
-    return NextResponse.json(
-      { error: "Failed to load messages" },
-      { status: 500 }
-    );
+    console.error("Chat GET error:", error);
+    return new NextResponse("Server error", { status: 500 });
   }
 }
 
-export async function POST(req: Request) {
+/**
+ * POST — Create a new chat message
+ */
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { roomSlug, content } = body as {
-      roomSlug?: string;
-      content?: string;
-    };
+    const { roomId, content } = body;
 
-    if (!roomSlug || !content?.trim()) {
-      return NextResponse.json(
-        { error: "roomSlug and content are required" },
-        { status: 400 }
-      );
+    if (!roomId || !content) {
+      return new NextResponse("roomId and content required", { status: 400 });
     }
 
-    // Get current student from JWT cookie
-    const cookieStore = cookies();
+    // ✔ FIX: Await cookies() in Next.js 14+
+    const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value;
     const secret = process.env.AUTH_JWT_SECRET;
 
     if (!token || !secret) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
+      return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    let payload: JwtPayload;
+    let decoded: { id: string; email: string } | null = null;
+
     try {
-      payload = jwt.verify(token, secret) as JwtPayload;
+      decoded = jwt.verify(token, secret) as { id: string; email: string };
     } catch {
-      return NextResponse.json(
-        { error: "Invalid session" },
-        { status: 401 }
-      );
+      return new NextResponse("Invalid token", { status: 401 });
     }
 
-    const room = await prisma.chatRoom.findUnique({
-      where: { slug: roomSlug }
+    // Ensure student exists
+    const student = await prisma.student.findUnique({
+      where: { id: decoded.id }
     });
 
-    if (!room) {
-      return NextResponse.json(
-        { error: "Room not found" },
-        { status: 404 }
-      );
+    if (!student) {
+      return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    // Create message
     const message = await prisma.chatMessage.create({
       data: {
-        roomId: room.id,
-        studentId: payload.id,
-        content: content.trim()
+        roomId,
+        studentId: student.id,
+        content
       },
-      include: { student: true }
+      include: {
+        student: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true
+          }
+        }
+      }
     });
 
-    const payloadForClients = {
-      id: message.id,
-      content: message.content,
-      createdAt: message.createdAt,
-      roomSlug,
-      student: {
-        id: message.student.id,
-        fullName: message.student.fullName,
-        avatarUrl: message.student.avatarUrl ?? null
-      }
-    };
-
-    // 🔴 Trigger Pusher event to update all subscribed clients
-    const channel = `chat-room-${roomSlug}`;
-    await pusherServer.trigger(channel, "message:new", payloadForClients);
-
-    return NextResponse.json({ message: payloadForClients });
-  } catch (error) {
-    console.error("POST /api/chat/messages error:", error);
-    return NextResponse.json(
-      { error: "Failed to send message" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message });
+  } catch (err) {
+    console.error("Chat POST error:", err);
+    return new NextResponse("Server error", { status: 500 });
   }
 }
