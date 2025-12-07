@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { RealtimeGroupChat } from "@/components/chat/RealtimeGroupChat";
 import { prisma } from "@/lib/prisma";
 
-// 🧾 Feature modules (cards)
+// Feature modules (cards)
 const featureCards = [
   {
     id: "pre-arrival",
@@ -16,7 +16,7 @@ const featureCards = [
     description:
       "Visa prep, housing decisions, and required documents before you land in Chicago.",
     image: "/pre-arrival.jpg",
-    badge: "Start Here",
+    badge: "Start Here"
   },
   {
     id: "campus-navigation",
@@ -25,7 +25,7 @@ const featureCards = [
     description:
       "Maps and routes to classrooms, labs, MTCC, Galvin Library, and more.",
     image: "/campus-navigation.jpg",
-    badge: "On Campus",
+    badge: "On Campus"
   },
   {
     id: "academic-integration",
@@ -34,7 +34,7 @@ const featureCards = [
     description:
       "Plan courses, understand milestones, and connect with advisers.",
     image: "/academic-integration.jpg",
-    badge: "Academics",
+    badge: "Academics"
   },
   {
     id: "social-networking",
@@ -43,74 +43,76 @@ const featureCards = [
     description:
       "Join student orgs, cultural groups, and peer communities at IIT.",
     image: "/social-networking.jpg",
-    badge: "Community",
-  },
+    badge: "Community"
+  }
 ];
 
-// 👥 Campus groups
+// Campus groups (simple grid)
 const campusGroups = [
   {
     name: "International Student Welcome Circle",
     focus: "Arrival support · Airport pickup coordination",
-    members: "120+ students",
+    members: "120+ students"
   },
   {
     name: "Grad Research & Tech Meetups",
     focus: "CS, Cybersecurity, AI, Data Science, and more",
-    members: "85+ students",
+    members: "85+ students"
   },
   {
     name: "Cultural Fusion Nights @ IIT",
     focus: "Food, music, and cultural exchange events",
-    members: "200+ students",
+    members: "200+ students"
   },
   {
     name: "Housing & Roommate Connect",
     focus: "Find roommates and off-campus housing tips",
-    members: "150+ students",
+    members: "150+ students"
   },
   {
     name: "Wellness & Balance Community",
     focus: "Mental health, fitness, and wellbeing",
-    members: "90+ students",
-  },
+    members: "90+ students"
+  }
 ];
 
-// 🔎 Type for marketplace products including owner
-type ProductWithOwner = {
+// Shape of products used on the dashboard
+type DashboardProduct = {
   id: string;
-  title: string;
   slug: string;
-  description: string;
+  title: string;
   priceCents: number;
-  category: string;
-  condition: string;
   imageUrl: string;
-  campus: string;
-  ownerId: string | null;
-  owner?: { fullName: string } | null;
-  isActive: boolean;
-  soldAt: Date | null;
-  paymentOptions: string;
-  createdAt: Date;
-  updatedAt: Date;
+  owner: {
+    fullName: string;
+  } | null;
 };
 
 export default async function DashboardPage() {
-  // Latest active marketplace listings
-  const products: ProductWithOwner[] = await prisma.product.findMany({
+  // Latest active marketplace listings from Neon via Prisma
+  const products: DashboardProduct[] = await prisma.product.findMany({
     where: { isActive: true },
     orderBy: { createdAt: "desc" },
     take: 4,
-    include: {
-      owner: { select: { fullName: true } },
-    },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      priceCents: true,
+      imageUrl: true,
+      owner: {
+        select: {
+          fullName: true
+        }
+      }
+    }
   });
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      {/* HERO SECTION */}
+      {/* HERO SECTION (short) */}
       <section className="grid gap-4 lg:grid-cols-[1.7fr,1.3fr]">
+        {/* Left: main hero text */}
         <Card className="bg-slate-50/95 border-red-100 shadow-[0_14px_32px_rgba(127,17,17,0.18)]">
           <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-600">
@@ -124,9 +126,18 @@ export default async function DashboardPage() {
               for classes, connect with peers, and trade items through the
               student marketplace.
             </p>
+            <p className="text-[11px] text-slate-800">
+              Start with <span className="font-semibold">Pre-Arrival</span> to
+              get your visa and documents ready, then explore{" "}
+              <span className="font-semibold">Campus Navigation</span>,{" "}
+              <span className="font-semibold">Academic Integration</span>, and{" "}
+              <span className="font-semibold">Social Networking</span> modules
+              as you settle into life in Chicago.
+            </p>
           </div>
         </Card>
 
+        {/* Right: compact info card */}
         <Card className="bg-slate-50/95 border-red-100 shadow-[0_14px_32px_rgba(127,17,17,0.22)]">
           <div className="flex h-full flex-col justify-between gap-3">
             <div>
@@ -154,7 +165,7 @@ export default async function DashboardPage() {
         </Card>
       </section>
 
-      {/* FEATURE MODULE CARDS */}
+      {/* FEATURE MODULE CARDS (with images) */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {featureCards.map((card) => (
           <Card
@@ -192,7 +203,7 @@ export default async function DashboardPage() {
         ))}
       </section>
 
-      {/* CAMPUS GROUPS */}
+      {/* CAMPUS GROUPS SECTION */}
       <section className="grid gap-4 lg:grid-cols-2">
         <Card className="bg-slate-50 border-red-100 shadow-[0_14px_32px_rgba(15,23,42,0.2)]">
           <div className="mb-2 flex items-center justify-between">
@@ -204,7 +215,8 @@ export default async function DashboardPage() {
                 Communities to join at IIT.
               </h2>
               <p className="text-[11px] text-slate-700">
-                Examples of student orgs you&apos;ll find through IIT.
+                These examples mirror the kinds of student orgs you&apos;ll find
+                through IIT and 312.iit.edu.
               </p>
             </div>
           </div>
@@ -217,7 +229,9 @@ export default async function DashboardPage() {
                 <p className="text-[11px] font-semibold text-slate-900">
                   {group.name}
                 </p>
-                <p className="mt-1 text-[10px] text-slate-700">{group.focus}</p>
+                <p className="mt-1 text-[10px] text-slate-700">
+                  {group.focus}
+                </p>
                 <p className="mt-1 text-[10px] font-semibold text-red-700">
                   {group.members}
                 </p>
@@ -226,7 +240,7 @@ export default async function DashboardPage() {
           </div>
         </Card>
 
-        {/* Quick Events */}
+        {/* Quick “Next Steps” or Events */}
         <Card className="bg-slate-50 border-red-100 shadow-[0_14px_32px_rgba(15,23,42,0.2)]">
           <div className="mb-2 flex items-center gap-2">
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-red-600/15 text-red-600 ring-1 ring-red-300">
@@ -250,9 +264,9 @@ export default async function DashboardPage() {
         </Card>
       </section>
 
-      {/* GROUP CHAT + MARKETPLACE */}
+      {/* GROUP CHAT + MARKETPLACE SECTION */}
       <section className="grid gap-4 xl:grid-cols-[1.6fr,1.4fr]">
-        {/* Group Chat */}
+        {/* Real-time chat card */}
         <Card className="bg-slate-50 border-red-100 shadow-[0_16px_40px_rgba(15,23,42,0.22)]">
           <div className="mb-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-600">
@@ -262,7 +276,8 @@ export default async function DashboardPage() {
               New Arrivals · Airport, housing, and first-week questions
             </h2>
             <p className="text-[11px] text-slate-700">
-              Chat with other international students in real time.
+              Chat with other international students in real time. Messages show
+              names and avatars from your dashboard profile.
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white">
@@ -270,7 +285,7 @@ export default async function DashboardPage() {
           </div>
         </Card>
 
-        {/* Marketplace */}
+        {/* Marketplace highlight */}
         <Card className="bg-slate-50 border-red-100 shadow-[0_16px_40px_rgba(15,23,42,0.22)]">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
@@ -278,7 +293,7 @@ export default async function DashboardPage() {
                 Student Marketplace
               </p>
               <h2 className="text-sm font-semibold text-slate-900">
-                Latest listings from IIT students
+                Latest listings from IIT students.
               </h2>
               <p className="text-[11px] text-slate-700">
                 Buy or sell textbooks, furniture, electronics, and more.
@@ -307,11 +322,11 @@ export default async function DashboardPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               {products.map((product) => {
                 const price = (product.priceCents || 0) / 100;
-                const sellerName = product.owner?.fullName || "IIT student";
+                const sellerName = product.owner?.fullName ?? "IIT student";
                 const imageSrc =
                   product.imageUrl && product.imageUrl.length > 0
                     ? product.imageUrl
-                    : "/placeholder-market.jpg";
+                    : "/placeholder-listing.jpg";
 
                 return (
                   <Link
