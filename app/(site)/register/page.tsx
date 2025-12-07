@@ -46,7 +46,7 @@ export default function RegisterPage() {
     setAvatarFile(file);
     const previewUrl = URL.createObjectURL(file);
     setAvatarPreview(previewUrl);
-    setError(null); // Clear any previous errors
+    setError(null);
   };
 
   const uploadAvatarToCloudinary = async (): Promise<string | null> => {
@@ -61,8 +61,9 @@ export default function RegisterPage() {
       const formData = new FormData();
       formData.append("file", avatarFile);
       formData.append("upload_preset", UPLOAD_PRESET);
-      formData.append("folder", "student-avatars"); // Optional: organize in folder
 
+      console.log("📤 Uploading to Cloudinary...");
+      
       const res = await fetch(
         `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`,
         {
@@ -72,16 +73,16 @@ export default function RegisterPage() {
       );
 
       const data = await res.json();
+      console.log("📥 Cloudinary response:", data);
+      
       if (!res.ok) {
-        console.error("Cloudinary upload error:", data.error?.message || data);
-        // Don't fail registration if avatar upload fails
+        console.error("Cloudinary upload error:", data);
         return null;
       }
 
       return data.secure_url as string;
     } catch (err) {
       console.error("Cloudinary upload error:", err);
-      // Don't fail registration if avatar upload fails
       return null;
     } finally {
       setAvatarUploading(false);
@@ -91,114 +92,142 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    console.log("🚀 Form submitted");
 
-    // Trim inputs to avoid whitespace issues
+    // Trim inputs
     const trimmedFullName = fullName.trim();
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedStudentType = studentType.trim();
     const trimmedProgram = program.trim();
 
+    console.log("📋 Form data:", {
+      fullName: trimmedFullName,
+      email: trimmedEmail,
+      passwordLength: password.length,
+      studentType: trimmedStudentType,
+      program: trimmedProgram,
+      hasAvatar: !!avatarFile
+    });
+
     if (!trimmedFullName || !trimmedEmail || !password || !trimmedStudentType || !trimmedProgram) {
-      setError(
-        "Full name, email, password, student type, and program are required."
-      );
+      const errorMsg = "Full name, email, password, student type, and program are required.";
+      console.error("❌ Validation error:", errorMsg);
+      setError(errorMsg);
       return;
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
-      setError("Please enter a valid email address.");
-      return;
-    }
-
-    // Basic IIT email check (optional)
-    if (!trimmedEmail.includes("@")) {
-      setError("Please use your IIT email address.");
+      const errorMsg = "Please enter a valid email address.";
+      console.error("❌ Email validation error:", errorMsg);
+      setError(errorMsg);
       return;
     }
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters long.");
+      const errorMsg = "Password must be at least 8 characters long.";
+      console.error("❌ Password validation error:", errorMsg);
+      setError(errorMsg);
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      const errorMsg = "Passwords do not match.";
+      console.error("❌ Password mismatch error:", errorMsg);
+      setError(errorMsg);
       return;
     }
 
     setLoading(true);
+    console.log("⏳ Starting registration process...");
+
     try {
-      // 1) Upload avatar if selected - don't block registration if it fails
+      // 1) Upload avatar if selected
       let avatarUrl: string | null = null;
       if (avatarFile) {
+        console.log("🖼️ Uploading avatar...");
         avatarUrl = await uploadAvatarToCloudinary();
-        // Continue even if avatar upload fails - it's optional
+        console.log("✅ Avatar upload result:", avatarUrl ? "Success" : "Failed/Skipped");
       }
 
-      // 2) Call your register API
-      const res = await fetch("/api/auth/register", {
+      // 2) Call register API
+      const apiUrl = "/api/auth/register";
+      const requestBody = {
+        fullName: trimmedFullName,
+        email: trimmedEmail,
+        password,
+        studentType: trimmedStudentType,
+        program: trimmedProgram,
+        avatarUrl
+      };
+
+      console.log("📤 Sending request to:", apiUrl);
+      console.log("📦 Request body:", JSON.stringify(requestBody, null, 2));
+
+      const res = await fetch(apiUrl, {
         method: "POST",
         headers: { 
-          "Content-Type": "application/json",
-          "Accept": "application/json"
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          fullName: trimmedFullName,
-          email: trimmedEmail,
-          password,
-          studentType: trimmedStudentType,
-          program: trimmedProgram,
-          avatarUrl
-        })
+        body: JSON.stringify(requestBody)
       });
 
-      const data = await res.json();
+      console.log("📥 Response status:", res.status);
+      console.log("📥 Response headers:", Object.fromEntries(res.headers.entries()));
+      
+      let data;
+      try {
+        data = await res.json();
+        console.log("📥 Response data:", data);
+      } catch (parseError) {
+        console.error("❌ Failed to parse response as JSON");
+        const textResponse = await res.text();
+        console.log("📥 Raw response:", textResponse);
+        throw new Error("Server returned invalid JSON");
+      }
       
       if (!res.ok) {
-        // Handle specific error messages from API
-        if (data.error && typeof data.error === 'string') {
-          throw new Error(data.error);
-        } else if (res.status === 409) {
-          throw new Error("An account with this email already exists.");
-        } else if (res.status === 400) {
-          throw new Error("Invalid input. Please check your information.");
-        } else {
-          throw new Error(`Registration failed (${res.status}). Please try again.`);
-        }
+        console.error("❌ API error response:", data);
+        throw new Error(data.error || `Registration failed (${res.status})`);
       }
 
-      // 3) Show success message before redirecting
-      if (data.message === "Registration successful") {
-        // Clear form
-        setFullName("");
-        setEmail("");
-        setPassword("");
-        setConfirmPassword("");
-        setStudentType("");
-        setProgram("");
-        setAvatarFile(null);
-        setAvatarPreview(null);
-        
-        // Show success message briefly
-        setError(null);
-        
-        // Redirect to login after a brief delay
-        setTimeout(() => {
-          router.push("/login");
-        }, 1000);
-      } else {
-        throw new Error("Unexpected response from server.");
-      }
+      // 3) Success handling
+      console.log("✅ Registration successful:", data);
+      
+      // Clear form
+      setFullName("");
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+      setStudentType("");
+      setProgram("");
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      
+      // Show success message
+      setError("✅ Registration successful! Redirecting to login...");
+      
+      // Redirect after delay
+      setTimeout(() => {
+        console.log("🔄 Redirecting to login...");
+        router.push("/login");
+      }, 2000);
       
     } catch (err: any) {
-      // Set error message
-      setError(err.message || "Registration failed. Please try again.");
+      console.error("❌ Registration catch error:", err);
+      console.error("❌ Error details:", {
+        name: err.name,
+        message: err.message,
+        stack: err.stack
+      });
       
-      // Log error for debugging
-      console.error("Registration error:", err);
+      // Set error message
+      const errorMsg = err.message || "Registration failed. Please try again.";
+      setError(errorMsg);
+      
     } finally {
+      console.log("🏁 Registration process complete");
       setLoading(false);
     }
   };
@@ -220,10 +249,19 @@ export default function RegisterPage() {
       <form
         onSubmit={handleSubmit}
         className="space-y-4 rounded-2xl bg-white p-5 shadow-sm shadow-slate-300/80"
+        noValidate
       >
+        {/* Debug info */}
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-2 text-xs">
+          <p className="font-semibold text-blue-800">Debug Info:</p>
+          <p>CLOUD_NAME: {CLOUD_NAME ? "✅ Set" : "❌ Missing"}</p>
+          <p>UPLOAD_PRESET: {UPLOAD_PRESET ? "✅ Set" : "❌ Missing"}</p>
+          <p>Status: {loading ? "⏳ Loading..." : "✅ Ready"}</p>
+        </div>
+
         {error && (
           <div className={`rounded-lg border px-3 py-2 text-xs ${
-            error.includes("successful") 
+            error.includes("✅") || error.includes("successful") 
               ? "border-green-300 bg-green-50 text-green-700"
               : "border-red-300 bg-red-50 text-red-700"
           }`}>
@@ -266,7 +304,6 @@ export default function RegisterPage() {
           <div className="space-y-1">
             <label className="block text-xs font-semibold text-slate-700">
               Password<span className="text-red-500">*</span>
-              <span className="ml-1 text-xs font-normal text-slate-500">(min 8 chars)</span>
             </label>
             <input
               type="password"
@@ -354,13 +391,8 @@ export default function RegisterPage() {
                 className="block w-full text-xs text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-red-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-red-500"
               />
               <p className="mt-1 text-[10px] text-slate-500">
-                Square images work best (e.g., 400x400). Max 5MB. You can update this later.
+                Square images work best (e.g., 400x400). Max 5MB.
               </p>
-              {avatarUploading && (
-                <p className="mt-0.5 text-[10px] text-red-600">
-                  Uploading image…
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -376,7 +408,7 @@ export default function RegisterPage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              Creating your account...
+              Processing...
             </span>
           ) : (
             "Create account"
@@ -393,6 +425,24 @@ export default function RegisterPage() {
           </Link>
         </p>
       </form>
+
+      {/* Debug section */}
+      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+        <h3 className="font-semibold text-slate-700">Debug Console:</h3>
+        <p className="mt-1 text-slate-600">Open browser console (F12) to see detailed logs</p>
+        <button
+          onClick={() => {
+            console.log("🧪 Test button clicked");
+            console.log("Current state:", {
+              fullName, email, password, studentType, program,
+              hasAvatar: !!avatarFile
+            });
+          }}
+          className="mt-2 rounded border border-slate-300 bg-white px-2 py-1 text-xs hover:bg-slate-50"
+        >
+          Log Current State
+        </button>
+      </div>
     </div>
   );
 }
