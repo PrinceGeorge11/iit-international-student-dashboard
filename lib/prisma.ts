@@ -8,7 +8,12 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: ["error", "warn"], // keep logs minimal but useful
+    log: ["error", "warn"],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    } // keep logs minimal but useful
   });
 
 // Avoid multiple instances in dev with Next.js hot reload
