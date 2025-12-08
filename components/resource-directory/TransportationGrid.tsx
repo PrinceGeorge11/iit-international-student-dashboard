@@ -8,6 +8,7 @@ import {
   Plane,
   MapPinned
 } from "lucide-react";
+import React from "react";
 
 interface TransportItem {
   id: string;
@@ -15,7 +16,7 @@ interface TransportItem {
   label: string;
   description: string;
   tip: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }
 
 const transportItems: TransportItem[] = [
@@ -36,7 +37,7 @@ const transportItems: TransportItem[] = [
     description:
       "City buses connect campus to nearby grocery stores, neighborhoods, and transit hubs.",
     tip:
-      "Include a simple &apos;How to ride&apos; guide: Ventra card, fares, and transfer basics.",
+      "Include a simple 'How to ride' guide: Ventra card, fares, and transfer basics.",
     icon: Bus
   },
   {
@@ -66,7 +67,7 @@ const transportItems: TransportItem[] = [
     description:
       "Guide from major airports to campus via train, bus, or ride-share, plus tips for late-night arrivals.",
     tip:
-      "Include simple step-by-step directions and estimated costs; link to pre-arrival section.",
+      "Include step-by-step directions and estimated costs; link to pre-arrival section.",
     icon: Plane
   }
 ];
@@ -95,6 +96,7 @@ export function TransportationGrid() {
               <span className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-red-600/20 text-red-300 ring-1 ring-red-500/40">
                 <Icon className="h-4 w-4" />
               </span>
+
               <div>
                 <p className="text-[11px] font-semibold text-slate-100">
                   {item.mode}
