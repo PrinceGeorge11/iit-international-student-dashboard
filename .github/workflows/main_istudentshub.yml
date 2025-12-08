@@ -53,6 +53,7 @@ jobs:
       - name: Azure WebApp Deploy
         uses: azure/webapps-deploy@v2
         with:
-          app-name: <YOUR_AZURE_APP_NAME>
+          app-name: iStudentsHub
           publish-profile: ${{ secrets.AZURE_APPSERVICE_PUBLISH_PROFILE }}
           package: .
+
